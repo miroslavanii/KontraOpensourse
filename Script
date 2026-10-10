@@ -41,6 +41,28 @@ screenGui.Name = "MovableGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
+-- OPEN/CLOSE POPUP HINT
+local hint = Instance.new("TextLabel")
+hint.Name = "OpenCloseHint"
+hint.Size = UDim2.fromOffset(280, 32)
+hint.Position = UDim2.new(0.5, -140, 1, -50)
+hint.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+hint.BackgroundTransparency = 0.15
+hint.BorderSizePixel = 0
+hint.Text = "X / Ctrl to open and close the menu"
+hint.TextColor3 = Color3.new(1, 1, 1)
+hint.TextSize = 12
+hint.Font = Enum.Font.GothamBold
+hint.TextTransparency = 0
+hint.Parent = screenGui
+
+Instance.new("UICorner", hint).CornerRadius = UDim.new(0, 7)
+
+local hintStroke = Instance.new("UIStroke")
+hintStroke.Color = Color3.fromRGB(55, 55, 55)
+hintStroke.Thickness = 1
+hintStroke.Parent = hint
+
 -- MAIN WINDOW
 local main = Instance.new("CanvasGroup")
 main.Name = "MainFrame"
@@ -202,8 +224,14 @@ local function selectTab(name)
     })
 end
 
-espTab.Activated:Connect(function() selectTab("ESP") end)
-configTab.Activated:Connect(function() selectTab("Config") end)
+espTab.Activated:Connect(function()
+    selectTab("ESP")
+end)
+
+configTab.Activated:Connect(function()
+    selectTab("Config")
+end)
+
 selectTab("ESP")
 
 -- ESP MAIN TOGGLE
@@ -233,8 +261,12 @@ desc.Parent = espPage
 local function removeESP(target)
     local objects = espObjects[target]
     if objects then
-        if objects.highlight then objects.highlight:Destroy() end
-        if objects.nameTag then objects.nameTag:Destroy() end
+        if objects.highlight then
+            objects.highlight:Destroy()
+        end
+        if objects.nameTag then
+            objects.nameTag:Destroy()
+        end
         espObjects[target] = nil
     end
 end
@@ -415,17 +447,24 @@ local function trackPlayer(target)
 
     target.CharacterAdded:Connect(function()
         task.wait(0.5)
-        if settings.Enabled then addESP(target) end
+        if settings.Enabled then
+            addESP(target)
+        end
     end)
 
     target.CharacterRemoving:Connect(function()
         removeESP(target)
     end)
 
-    if settings.Enabled then addESP(target) end
+    if settings.Enabled then
+        addESP(target)
+    end
 end
 
-for _, target in Players:GetPlayers() do trackPlayer(target) end
+for _, target in Players:GetPlayers() do
+    trackPlayer(target)
+end
+
 Players.PlayerAdded:Connect(trackPlayer)
 Players.PlayerRemoving:Connect(removeESP)
 
@@ -517,7 +556,8 @@ end)
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
 
-    if input.KeyCode == Enum.KeyCode.LeftControl then
+    if input.KeyCode == Enum.KeyCode.LeftControl
+        or input.KeyCode == Enum.KeyCode.X then
         toggleGUI()
     end
 end)
