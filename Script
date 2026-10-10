@@ -1,35 +1,67 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
 local oldGui = playerGui:FindFirstChild("MovableGui")
-if oldGui then
-    oldGui:Destroy()
+if oldGui then oldGui:Destroy() end
+
+-- SETTINGS
+local settings = {
+    Enabled = false,
+    Names = true,
+    Highlights = true,
+    Fill = true,
+    Outline = true
+}
+
+local espObjects = {}
+local animating = false
+local isOpen = false
+
+local OPEN_TIME = 0.28
+local CLOSE_TIME = 0.20
+
+local function tween(obj, duration, style, direction, props)
+    local info = TweenInfo.new(
+        duration,
+        style or Enum.EasingStyle.Quad,
+        direction or Enum.EasingDirection.Out
+    )
+    local tw = TweenService:Create(obj, info, props)
+    tw:Play()
+    return tw
 end
 
+-- SCREEN GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MovableGui"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = playerGui
 
--- Main window
-local main = Instance.new("Frame")
+-- MAIN WINDOW
+local main = Instance.new("CanvasGroup")
 main.Name = "MainFrame"
-main.Size = UDim2.fromOffset(440, 300)
-main.Position = UDim2.new(0.5, -220, 0.5, -150)
+main.Size = UDim2.fromOffset(440, 340)
+main.Position = UDim2.new(0.5, -220, 0.5, -170)
 main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 main.BorderSizePixel = 0
+main.GroupTransparency = 1
+main.Visible = false
 main.Active = true
 main.ClipsDescendants = true
 main.Parent = screenGui
 
 Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
 
--- Title bar
+local uiScale = Instance.new("UIScale")
+uiScale.Scale = 0.85
+uiScale.Parent = main
+
+-- TITLE BAR
 local titleBar = Instance.new("Frame")
-titleBar.Name = "TitleBar"
 titleBar.Size = UDim2.new(1, 0, 0, 38)
 titleBar.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
 titleBar.BorderSizePixel = 0
@@ -47,7 +79,6 @@ title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = titleBar
 
--- Close button
 local closeButton = Instance.new("TextButton")
 closeButton.Size = UDim2.fromOffset(34, 30)
 closeButton.Position = UDim2.new(1, -38, 0, 4)
@@ -58,18 +89,63 @@ closeButton.TextSize = 16
 closeButton.Font = Enum.Font.GothamBold
 closeButton.BorderSizePixel = 0
 closeButton.Parent = titleBar
-
 Instance.new("UICorner", closeButton).CornerRadius = UDim.new(0, 6)
 
--- Tab bar
+-- OPEN/CLOSE ANIMATIONS
+local function openGUI()
+    if animating or isOpen then return end
+    animating = true
+    isOpen = true
+
+    main.Visible = true
+    main.GroupTransparency = 1
+    uiScale.Scale = 0.85
+
+    tween(main, OPEN_TIME, Enum.EasingStyle.Quad,
+        Enum.EasingDirection.Out, {GroupTransparency = 0})
+
+    local scaleTween = tween(uiScale, OPEN_TIME,
+        Enum.EasingStyle.Back, Enum.EasingDirection.Out,
+        {Scale = 1})
+
+    scaleTween.Completed:Wait()
+    animating = false
+end
+
+local function closeGUI()
+    if animating or not isOpen then return end
+    animating = true
+    isOpen = false
+
+    tween(main, CLOSE_TIME, Enum.EasingStyle.Quad,
+        Enum.EasingDirection.In, {GroupTransparency = 1})
+
+    local scaleTween = tween(uiScale, CLOSE_TIME,
+        Enum.EasingStyle.Quad, Enum.EasingDirection.In,
+        {Scale = 0.85})
+
+    scaleTween.Completed:Wait()
+    main.Visible = false
+    animating = false
+end
+
+local function toggleGUI()
+    if animating then return end
+    if isOpen then
+        task.spawn(closeGUI)
+    else
+        task.spawn(openGUI)
+    end
+end
+
+-- TABS
 local tabBar = Instance.new("Frame")
-tabBar.Name = "TabBar"
 tabBar.Size = UDim2.new(1, -20, 0, 36)
 tabBar.Position = UDim2.fromOffset(10, 46)
 tabBar.BackgroundTransparency = 1
 tabBar.Parent = main
 
-local function createTabButton(name, position)
+local function createTab(name, position)
     local button = Instance.new("TextButton")
     button.Name = name .. "TabButton"
     button.Size = UDim2.new(0.5, -4, 1, 0)
@@ -81,208 +157,279 @@ local function createTabButton(name, position)
     button.Font = Enum.Font.GothamBold
     button.BorderSizePixel = 0
     button.Parent = tabBar
-
-    Instance.new("UICorner", button).CornerRadius =
-        UDim.new(0, 6)
-
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
     return button
 end
 
-local espTabButton = createTabButton(
-    "ESP", UDim2.new(0, 0, 0, 0)
-)
+local espTab = createTab("ESP", UDim2.new(0, 0, 0, 0))
+local configTab = createTab("Config", UDim2.new(0.5, 4, 0, 0))
 
-local configTabButton = createTabButton(
-    "Config", UDim2.new(0.5, 4, 0, 0)
-)
-
--- Tab pages
 local espPage = Instance.new("Frame")
-espPage.Name = "ESPPage"
 espPage.Size = UDim2.new(1, -20, 1, -100)
 espPage.Position = UDim2.fromOffset(10, 90)
 espPage.BackgroundTransparency = 1
 espPage.Parent = main
 
--- Empty Config tab
-local configPage = Instance.new("Frame")
-configPage.Name = "ConfigPage"
+local configPage = Instance.new("ScrollingFrame")
 configPage.Size = UDim2.new(1, -20, 1, -100)
 configPage.Position = UDim2.fromOffset(10, 90)
 configPage.BackgroundTransparency = 1
+configPage.BorderSizePixel = 0
+configPage.ScrollBarThickness = 4
+configPage.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+configPage.CanvasSize = UDim2.new(0, 0, 0, 0)
 configPage.Visible = false
 configPage.Parent = main
 
-local function selectTab(tab)
-    espPage.Visible = tab == "ESP"
-    configPage.Visible = tab == "Config"
+local layout = Instance.new("UIListLayout")
+layout.Padding = UDim.new(0, 8)
+layout.SortOrder = Enum.SortOrder.LayoutOrder
+layout.Parent = configPage
 
-    espTabButton.BackgroundColor3 = tab == "ESP"
-        and Color3.fromRGB(50, 50, 50)
-        or Color3.fromRGB(15, 15, 15)
+local function selectTab(name)
+    espPage.Visible = name == "ESP"
+    configPage.Visible = name == "Config"
 
-    configTabButton.BackgroundColor3 = tab == "Config"
-        and Color3.fromRGB(50, 50, 50)
-        or Color3.fromRGB(15, 15, 15)
+    tween(espTab, 0.15, nil, nil, {
+        BackgroundColor3 = name == "ESP"
+            and Color3.fromRGB(50, 50, 50)
+            or Color3.fromRGB(15, 15, 15)
+    })
+    tween(configTab, 0.15, nil, nil, {
+        BackgroundColor3 = name == "Config"
+            and Color3.fromRGB(50, 50, 50)
+            or Color3.fromRGB(15, 15, 15)
+    })
 end
 
-espTabButton.Activated:Connect(function()
-    selectTab("ESP")
-end)
-
-configTabButton.Activated:Connect(function()
-    selectTab("Config")
-end)
-
+espTab.Activated:Connect(function() selectTab("ESP") end)
+configTab.Activated:Connect(function() selectTab("Config") end)
 selectTab("ESP")
 
--- ESP toggle
-local espEnabled = false
-local espObjects = {}
-
+-- ESP MAIN TOGGLE
 local espButton = Instance.new("TextButton")
-espButton.Name = "ESPToggle"
 espButton.Size = UDim2.new(1, 0, 0, 42)
 espButton.Position = UDim2.fromOffset(0, 5)
 espButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-espButton.Text = "PLAYER ESP: OFF"
 espButton.TextColor3 = Color3.new(1, 1, 1)
 espButton.TextSize = 14
 espButton.Font = Enum.Font.GothamBold
 espButton.BorderSizePixel = 0
 espButton.Parent = espPage
+Instance.new("UICorner", espButton).CornerRadius = UDim.new(0, 7)
 
-Instance.new("UICorner", espButton).CornerRadius =
-    UDim.new(0, 7)
+local desc = Instance.new("TextLabel")
+desc.Size = UDim2.new(1, 0, 0, 45)
+desc.Position = UDim2.fromOffset(0, 55)
+desc.BackgroundTransparency = 1
+desc.Text = "Toggle player ESP here.\nCustomize its appearance in Config."
+desc.TextColor3 = Color3.fromRGB(180, 180, 180)
+desc.TextSize = 13
+desc.Font = Enum.Font.Gotham
+desc.TextWrapped = true
+desc.Parent = espPage
 
+-- ESP MANAGEMENT
 local function removeESP(target)
     local objects = espObjects[target]
     if objects then
-        if objects.highlight then
-            objects.highlight:Destroy()
-        end
-        if objects.nameTag then
-            objects.nameTag:Destroy()
-        end
+        if objects.highlight then objects.highlight:Destroy() end
+        if objects.nameTag then objects.nameTag:Destroy() end
         espObjects[target] = nil
     end
 end
 
 local function addESP(target)
-    if not espEnabled or target == player then
-        return
-    end
+    if not settings.Enabled or target == player then return end
 
     local character = target.Character
     if not character then
+        removeESP(target)
         return
     end
 
-    if espObjects[target]
-        and espObjects[target].highlight
-        and espObjects[target].highlight.Parent
-        and espObjects[target].highlight.Adornee == character then
-        return
+    local current = espObjects[target]
+    if current and current.character == character then
+        if current.highlight then
+            current.highlight.Enabled = settings.Highlights
+            current.highlight.FillTransparency = settings.Fill and 0.5 or 1
+            current.highlight.OutlineTransparency = settings.Outline and 0 or 1
+        end
+        if current.nameTag then
+            current.nameTag.Enabled = settings.Names
+        end
+        if (settings.Names and not current.nameTag)
+            or (settings.Highlights and not current.highlight) then
+            removeESP(target)
+        else
+            return
+        end
     end
 
     removeESP(target)
 
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "PlayerESP"
-    highlight.Adornee = character
-    highlight.FillColor = Color3.fromRGB(255, 255, 255)
-    highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
-    highlight.FillTransparency = 0.5
-    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.Parent = screenGui
+    local objects = {character = character}
 
-    local nameTag
-    local head = character:FindFirstChild("Head")
-
-    if head then
-        nameTag = Instance.new("BillboardGui")
-        nameTag.Name = "ESPName"
-        nameTag.Adornee = head
-        nameTag.Size = UDim2.fromOffset(200, 32)
-        nameTag.StudsOffset = Vector3.new(0, 2.5, 0)
-        nameTag.AlwaysOnTop = true
-        nameTag.Parent = screenGui
-
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.fromScale(1, 1)
-        label.BackgroundTransparency = 1
-        label.Text = target.DisplayName .. " (@" .. target.Name .. ")"
-        label.TextColor3 = Color3.new(1, 1, 1)
-        label.TextStrokeColor3 = Color3.new(0, 0, 0)
-        label.TextStrokeTransparency = 0
-        label.TextScaled = true
-        label.Font = Enum.Font.GothamBold
-        label.Parent = nameTag
+    if settings.Highlights then
+        local highlight = Instance.new("Highlight")
+        highlight.Name = "PlayerESP"
+        highlight.Adornee = character
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        highlight.FillColor = Color3.new(1, 1, 1)
+        highlight.OutlineColor = Color3.new(1, 1, 1)
+        highlight.FillTransparency = settings.Fill and 0.5 or 1
+        highlight.OutlineTransparency = settings.Outline and 0 or 1
+        highlight.Parent = screenGui
+        objects.highlight = highlight
     end
 
-    espObjects[target] = {
-        highlight = highlight,
-        nameTag = nameTag
-    }
+    if settings.Names then
+        local head = character:FindFirstChild("Head")
+        if head then
+            local tag = Instance.new("BillboardGui")
+            tag.Name = "ESPName"
+            tag.Adornee = head
+            tag.Size = UDim2.fromOffset(200, 32)
+            tag.StudsOffset = Vector3.new(0, 2.5, 0)
+            tag.AlwaysOnTop = true
+            tag.Parent = screenGui
+
+            local label = Instance.new("TextLabel")
+            label.Size = UDim2.fromScale(1, 1)
+            label.BackgroundTransparency = 1
+            label.Text = target.DisplayName .. " (@" .. target.Name .. ")"
+            label.TextColor3 = Color3.new(1, 1, 1)
+            label.TextStrokeColor3 = Color3.new(0, 0, 0)
+            label.TextStrokeTransparency = 0
+            label.TextScaled = true
+            label.Font = Enum.Font.GothamBold
+            label.Parent = tag
+
+            objects.nameTag = tag
+        end
+    end
+
+    espObjects[target] = objects
 end
 
-local function updateESP()
-    espButton.Text = espEnabled
-        and "PLAYER ESP: ON"
-        or "PLAYER ESP: OFF"
+local function refreshESP()
+    espButton.Text = settings.Enabled and "PLAYER ESP: ON" or "PLAYER ESP: OFF"
 
-    espButton.BackgroundColor3 = espEnabled
-        and Color3.fromRGB(0, 150, 70)
-        or Color3.fromRGB(20, 20, 20)
+    tween(espButton, 0.15, nil, nil, {
+        BackgroundColor3 = settings.Enabled
+            and Color3.fromRGB(0, 150, 70)
+            or Color3.fromRGB(20, 20, 20)
+    })
 
-    if espEnabled then
-        for _, target in Players:GetPlayers() do
-            if target ~= player then
+    for _, target in Players:GetPlayers() do
+        if target ~= player then
+            if settings.Enabled then
                 addESP(target)
+            else
+                removeESP(target)
             end
-        end
-    else
-        for target in pairs(espObjects) do
-            removeESP(target)
         end
     end
 end
 
 espButton.Activated:Connect(function()
-    espEnabled = not espEnabled
-    updateESP()
+    settings.Enabled = not settings.Enabled
+    refreshESP()
 end)
 
--- Player join and respawn support
-local function trackPlayer(target)
-    if target == player then
-        return
+-- CONFIG SWITCHES
+local function createSetting(name, detail, key, order)
+    local button = Instance.new("TextButton")
+    button.Name = key .. "Toggle"
+    button.Size = UDim2.new(1, -4, 0, 48)
+    button.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    button.Text = ""
+    button.BorderSizePixel = 0
+    button.LayoutOrder = order
+    button.Parent = configPage
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.68, 0, 0, 22)
+    label.Position = UDim2.fromOffset(10, 3)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextSize = 13
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = button
+
+    local sub = Instance.new("TextLabel")
+    sub.Size = UDim2.new(0.72, 0, 0, 16)
+    sub.Position = UDim2.fromOffset(10, 26)
+    sub.BackgroundTransparency = 1
+    sub.Text = detail
+    sub.TextColor3 = Color3.fromRGB(150, 150, 150)
+    sub.TextSize = 10
+    sub.Font = Enum.Font.Gotham
+    sub.TextXAlignment = Enum.TextXAlignment.Left
+    sub.Parent = button
+
+    local state = Instance.new("TextLabel")
+    state.Size = UDim2.fromOffset(65, 28)
+    state.Position = UDim2.new(1, -75, 0.5, -14)
+    state.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    state.TextColor3 = Color3.new(1, 1, 1)
+    state.TextSize = 11
+    state.Font = Enum.Font.GothamBold
+    state.BorderSizePixel = 0
+    state.Parent = button
+    Instance.new("UICorner", state).CornerRadius = UDim.new(0, 5)
+
+    local function update()
+        state.Text = settings[key] and "ON" or "OFF"
+        tween(state, 0.15, nil, nil, {
+            BackgroundColor3 = settings[key]
+                and Color3.fromRGB(0, 150, 70)
+                or Color3.fromRGB(35, 35, 35)
+        })
     end
+
+    button.Activated:Connect(function()
+        settings[key] = not settings[key]
+        update()
+        refreshESP()
+    end)
+
+    update()
+end
+
+createSetting("Player Names", "Show names above players", "Names", 1)
+createSetting("Player Highlight", "Highlight characters through walls", "Highlights", 2)
+createSetting("Highlight Fill", "Show the inside of highlights", "Fill", 3)
+createSetting("Highlight Outline", "Show the outline of highlights", "Outline", 4)
+
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    configPage.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 8)
+end)
+
+-- PLAYER JOIN / RESPAWN
+local function trackPlayer(target)
+    if target == player then return end
 
     target.CharacterAdded:Connect(function()
         task.wait(0.5)
-        if espEnabled then
-            addESP(target)
-        end
+        if settings.Enabled then addESP(target) end
     end)
 
     target.CharacterRemoving:Connect(function()
         removeESP(target)
     end)
 
-    if espEnabled then
-        addESP(target)
-    end
+    if settings.Enabled then addESP(target) end
 end
 
-for _, target in Players:GetPlayers() do
-    trackPlayer(target)
-end
-
+for _, target in Players:GetPlayers() do trackPlayer(target) end
 Players.PlayerAdded:Connect(trackPlayer)
 Players.PlayerRemoving:Connect(removeESP)
 
--- Drag window
+-- DRAG WINDOW
 local dragging = false
 local dragStart
 local startPosition
@@ -302,12 +449,9 @@ UserInputService.InputChanged:Connect(function(input)
         or input.UserInputType == Enum.UserInputType.Touch
     ) then
         local delta = input.Position - dragStart
-
         main.Position = UDim2.new(
-            startPosition.X.Scale,
-            startPosition.X.Offset + delta.X,
-            startPosition.Y.Scale,
-            startPosition.Y.Offset + delta.Y
+            startPosition.X.Scale, startPosition.X.Offset + delta.X,
+            startPosition.Y.Scale, startPosition.Y.Offset + delta.Y
         )
     end
 end)
@@ -319,7 +463,7 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Resize handle
+-- RESIZE HANDLE
 local resize = Instance.new("TextButton")
 resize.Name = "ResizeHandle"
 resize.Size = UDim2.fromOffset(24, 24)
@@ -351,10 +495,9 @@ UserInputService.InputChanged:Connect(function(input)
         or input.UserInputType == Enum.UserInputType.Touch
     ) then
         local delta = input.Position - resizeStart
-
         main.Size = UDim2.fromOffset(
             math.clamp(startSize.X.Offset + delta.X, 250, 800),
-            math.clamp(startSize.Y.Offset + delta.Y, 160, 600)
+            math.clamp(startSize.Y.Offset + delta.Y, 180, 600)
         )
     end
 end)
@@ -366,17 +509,15 @@ UserInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- Close and reopen with Left Ctrl
+-- CLOSE / REOPEN
 closeButton.Activated:Connect(function()
-    main.Visible = false
+    task.spawn(closeGUI)
 end)
 
 UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then
-        return
-    end
+    if processed then return end
 
     if input.KeyCode == Enum.KeyCode.LeftControl then
-        main.Visible = not main.Visible
+        toggleGUI()
     end
 end)
