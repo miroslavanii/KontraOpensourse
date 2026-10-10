@@ -1,0 +1,382 @@
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local player = Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+local oldGui = playerGui:FindFirstChild("MovableGui")
+if oldGui then
+    oldGui:Destroy()
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "MovableGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = playerGui
+
+-- Main window
+local main = Instance.new("Frame")
+main.Name = "MainFrame"
+main.Size = UDim2.fromOffset(440, 300)
+main.Position = UDim2.new(0.5, -220, 0.5, -150)
+main.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+main.BorderSizePixel = 0
+main.Active = true
+main.ClipsDescendants = true
+main.Parent = screenGui
+
+Instance.new("UICorner", main).CornerRadius = UDim.new(0, 10)
+
+-- Title bar
+local titleBar = Instance.new("Frame")
+titleBar.Name = "TitleBar"
+titleBar.Size = UDim2.new(1, 0, 0, 38)
+titleBar.BackgroundColor3 = Color3.fromRGB(8, 8, 8)
+titleBar.BorderSizePixel = 0
+titleBar.Active = true
+titleBar.Parent = main
+
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, -55, 1, 0)
+title.Position = UDim2.fromOffset(12, 0)
+title.BackgroundTransparency = 1
+title.Text = "Onix Hub"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.TextSize = 16
+title.Font = Enum.Font.GothamBold
+title.TextXAlignment = Enum.TextXAlignment.Left
+title.Parent = titleBar
+
+-- Close button
+local closeButton = Instance.new("TextButton")
+closeButton.Size = UDim2.fromOffset(34, 30)
+closeButton.Position = UDim2.new(1, -38, 0, 4)
+closeButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+closeButton.Text = "X"
+closeButton.TextColor3 = Color3.new(1, 1, 1)
+closeButton.TextSize = 16
+closeButton.Font = Enum.Font.GothamBold
+closeButton.BorderSizePixel = 0
+closeButton.Parent = titleBar
+
+Instance.new("UICorner", closeButton).CornerRadius = UDim.new(0, 6)
+
+-- Tab bar
+local tabBar = Instance.new("Frame")
+tabBar.Name = "TabBar"
+tabBar.Size = UDim2.new(1, -20, 0, 36)
+tabBar.Position = UDim2.fromOffset(10, 46)
+tabBar.BackgroundTransparency = 1
+tabBar.Parent = main
+
+local function createTabButton(name, position)
+    local button = Instance.new("TextButton")
+    button.Name = name .. "TabButton"
+    button.Size = UDim2.new(0.5, -4, 1, 0)
+    button.Position = position
+    button.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    button.Text = name
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.TextSize = 14
+    button.Font = Enum.Font.GothamBold
+    button.BorderSizePixel = 0
+    button.Parent = tabBar
+
+    Instance.new("UICorner", button).CornerRadius =
+        UDim.new(0, 6)
+
+    return button
+end
+
+local espTabButton = createTabButton(
+    "ESP", UDim2.new(0, 0, 0, 0)
+)
+
+local configTabButton = createTabButton(
+    "Config", UDim2.new(0.5, 4, 0, 0)
+)
+
+-- Tab pages
+local espPage = Instance.new("Frame")
+espPage.Name = "ESPPage"
+espPage.Size = UDim2.new(1, -20, 1, -100)
+espPage.Position = UDim2.fromOffset(10, 90)
+espPage.BackgroundTransparency = 1
+espPage.Parent = main
+
+-- Empty Config tab
+local configPage = Instance.new("Frame")
+configPage.Name = "ConfigPage"
+configPage.Size = UDim2.new(1, -20, 1, -100)
+configPage.Position = UDim2.fromOffset(10, 90)
+configPage.BackgroundTransparency = 1
+configPage.Visible = false
+configPage.Parent = main
+
+local function selectTab(tab)
+    espPage.Visible = tab == "ESP"
+    configPage.Visible = tab == "Config"
+
+    espTabButton.BackgroundColor3 = tab == "ESP"
+        and Color3.fromRGB(50, 50, 50)
+        or Color3.fromRGB(15, 15, 15)
+
+    configTabButton.BackgroundColor3 = tab == "Config"
+        and Color3.fromRGB(50, 50, 50)
+        or Color3.fromRGB(15, 15, 15)
+end
+
+espTabButton.Activated:Connect(function()
+    selectTab("ESP")
+end)
+
+configTabButton.Activated:Connect(function()
+    selectTab("Config")
+end)
+
+selectTab("ESP")
+
+-- ESP toggle
+local espEnabled = false
+local espObjects = {}
+
+local espButton = Instance.new("TextButton")
+espButton.Name = "ESPToggle"
+espButton.Size = UDim2.new(1, 0, 0, 42)
+espButton.Position = UDim2.fromOffset(0, 5)
+espButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+espButton.Text = "PLAYER ESP: OFF"
+espButton.TextColor3 = Color3.new(1, 1, 1)
+espButton.TextSize = 14
+espButton.Font = Enum.Font.GothamBold
+espButton.BorderSizePixel = 0
+espButton.Parent = espPage
+
+Instance.new("UICorner", espButton).CornerRadius =
+    UDim.new(0, 7)
+
+local function removeESP(target)
+    local objects = espObjects[target]
+    if objects then
+        if objects.highlight then
+            objects.highlight:Destroy()
+        end
+        if objects.nameTag then
+            objects.nameTag:Destroy()
+        end
+        espObjects[target] = nil
+    end
+end
+
+local function addESP(target)
+    if not espEnabled or target == player then
+        return
+    end
+
+    local character = target.Character
+    if not character then
+        return
+    end
+
+    if espObjects[target]
+        and espObjects[target].highlight
+        and espObjects[target].highlight.Parent
+        and espObjects[target].highlight.Adornee == character then
+        return
+    end
+
+    removeESP(target)
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "PlayerESP"
+    highlight.Adornee = character
+    highlight.FillColor = Color3.fromRGB(255, 255, 255)
+    highlight.OutlineColor = Color3.fromRGB(0, 0, 0)
+    highlight.FillTransparency = 0.5
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = screenGui
+
+    local nameTag
+    local head = character:FindFirstChild("Head")
+
+    if head then
+        nameTag = Instance.new("BillboardGui")
+        nameTag.Name = "ESPName"
+        nameTag.Adornee = head
+        nameTag.Size = UDim2.fromOffset(200, 32)
+        nameTag.StudsOffset = Vector3.new(0, 2.5, 0)
+        nameTag.AlwaysOnTop = true
+        nameTag.Parent = screenGui
+
+        local label = Instance.new("TextLabel")
+        label.Size = UDim2.fromScale(1, 1)
+        label.BackgroundTransparency = 1
+        label.Text = target.DisplayName .. " (@" .. target.Name .. ")"
+        label.TextColor3 = Color3.new(1, 1, 1)
+        label.TextStrokeColor3 = Color3.new(0, 0, 0)
+        label.TextStrokeTransparency = 0
+        label.TextScaled = true
+        label.Font = Enum.Font.GothamBold
+        label.Parent = nameTag
+    end
+
+    espObjects[target] = {
+        highlight = highlight,
+        nameTag = nameTag
+    }
+end
+
+local function updateESP()
+    espButton.Text = espEnabled
+        and "PLAYER ESP: ON"
+        or "PLAYER ESP: OFF"
+
+    espButton.BackgroundColor3 = espEnabled
+        and Color3.fromRGB(0, 150, 70)
+        or Color3.fromRGB(20, 20, 20)
+
+    if espEnabled then
+        for _, target in Players:GetPlayers() do
+            if target ~= player then
+                addESP(target)
+            end
+        end
+    else
+        for target in pairs(espObjects) do
+            removeESP(target)
+        end
+    end
+end
+
+espButton.Activated:Connect(function()
+    espEnabled = not espEnabled
+    updateESP()
+end)
+
+-- Player join and respawn support
+local function trackPlayer(target)
+    if target == player then
+        return
+    end
+
+    target.CharacterAdded:Connect(function()
+        task.wait(0.5)
+        if espEnabled then
+            addESP(target)
+        end
+    end)
+
+    target.CharacterRemoving:Connect(function()
+        removeESP(target)
+    end)
+
+    if espEnabled then
+        addESP(target)
+    end
+end
+
+for _, target in Players:GetPlayers() do
+    trackPlayer(target)
+end
+
+Players.PlayerAdded:Connect(trackPlayer)
+Players.PlayerRemoving:Connect(removeESP)
+
+-- Drag window
+local dragging = false
+local dragStart
+local startPosition
+
+titleBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPosition = main.Position
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and (
+        input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch
+    ) then
+        local delta = input.Position - dragStart
+
+        main.Position = UDim2.new(
+            startPosition.X.Scale,
+            startPosition.X.Offset + delta.X,
+            startPosition.Y.Scale,
+            startPosition.Y.Offset + delta.Y
+        )
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+-- Resize handle
+local resize = Instance.new("TextButton")
+resize.Name = "ResizeHandle"
+resize.Size = UDim2.fromOffset(24, 24)
+resize.AnchorPoint = Vector2.new(1, 1)
+resize.Position = UDim2.new(1, 0, 1, 0)
+resize.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+resize.Text = "◢"
+resize.TextColor3 = Color3.new(1, 1, 1)
+resize.TextSize = 14
+resize.BorderSizePixel = 0
+resize.Parent = main
+
+local resizing = false
+local resizeStart
+local startSize
+
+resize.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        resizing = true
+        resizeStart = input.Position
+        startSize = main.Size
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if resizing and (
+        input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch
+    ) then
+        local delta = input.Position - resizeStart
+
+        main.Size = UDim2.fromOffset(
+            math.clamp(startSize.X.Offset + delta.X, 250, 800),
+            math.clamp(startSize.Y.Offset + delta.Y, 160, 600)
+        )
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+        resizing = false
+    end
+end)
+
+-- Close and reopen with Left Ctrl
+closeButton.Activated:Connect(function()
+    main.Visible = false
+end)
+
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then
+        return
+    end
+
+    if input.KeyCode == Enum.KeyCode.LeftControl then
+        main.Visible = not main.Visible
+    end
+end)
