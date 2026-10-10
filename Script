@@ -17,7 +17,8 @@ local settings = {
     Fill = true,
     Outline = true,
     FillColor = Color3.fromRGB(255, 255, 255),
-    OutlineColor = Color3.fromRGB(255, 255, 255)
+    OutlineColor = Color3.fromRGB(255, 255, 255),
+    Noclip = false
 }
 
 local espObjects = {}
@@ -37,6 +38,44 @@ local function tween(obj, duration, style, direction, props)
     local tw = TweenService:Create(obj, info, props)
     tw:Play()
     return tw
+end
+
+-- NOCLIP INTEGRATION
+local NoclipConnection = nil
+local ClipState = true
+
+local function startNoclip()
+    if NoclipConnection then NoclipConnection:Disconnect() end
+    ClipState = false
+    
+    local function Nocl()
+        if ClipState == false and player.Character ~= nil then
+            for _, v in pairs(player.Character:GetDescendants()) do
+                if v:IsA('BasePart') and v.CanCollide then
+                    v.CanCollide = false
+                end
+            end
+        end
+        task.wait(0.21) -- basic optimization
+    end
+    
+    NoclipConnection = RunService.Stepped:Connect(Nocl)
+end
+
+local function stopNoclip()
+    if NoclipConnection then 
+        NoclipConnection:Disconnect() 
+        NoclipConnection = nil
+    end
+    ClipState = true
+    
+    if player.Character then
+        for _, v in pairs(player.Character:GetDescendants()) do
+            if v:IsA('BasePart') then
+                v.CanCollide = true
+            end
+        end
+    end
 end
 
 -- SCREEN GUI (ALWAYS ON TOP)
@@ -115,7 +154,7 @@ title.Size = UDim2.new(1, -55, 1, 0)
 title.Position = UDim2.fromOffset(12, 0)
 title.BackgroundTransparency = 1
 title.Text = "Onix Hub"
-title.TextColor3 = Color3.new(1, 1, 1) -- Pure White Text
+title.TextColor3 = Color3.new(1, 1, 1)
 title.TextSize = 16
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
@@ -126,7 +165,7 @@ closeButton.Size = UDim2.fromOffset(34, 30)
 closeButton.Position = UDim2.new(1, -38, 0, 4)
 closeButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 closeButton.Text = "X"
-closeButton.TextColor3 = Color3.new(1, 1, 1) -- Pure White Text
+closeButton.TextColor3 = Color3.new(1, 1, 1)
 closeButton.TextSize = 16
 closeButton.Font = Enum.Font.GothamBold
 closeButton.BorderSizePixel = 0
@@ -259,12 +298,12 @@ local function destroyGUI()
     if destroyed then return end
     destroyed = true
 
-    -- Remove all ESP highlights/tags
+    stopNoclip()
+
     for target in pairs(espObjects) do
         removeESP(target)
     end
 
-    -- Play close animation then destroy
     tween(main, CLOSE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In, {GroupTransparency = 1})
     local scaleTween = tween(uiScale, CLOSE_TIME, Enum.EasingStyle.Quad, Enum.EasingDirection.In, {Scale = 0.85})
     scaleTween.Completed:Wait()
@@ -272,7 +311,6 @@ local function destroyGUI()
     screenGui:Destroy()
 end
 
--- SHOW/HIDE WARNING MODAL CONNECTIONS
 closeButton.Activated:Connect(showModal)
 cancelBtn.Activated:Connect(hideModal)
 confirmBtn.Activated:Connect(destroyGUI)
@@ -547,7 +585,7 @@ espButton.Activated:Connect(function()
 end)
 
 -- GENERIC TOGGLE CREATOR
-local function createSetting(parent, name, detail, key, order)
+local function createSetting(parent, name, detail, key, order, callback)
     local button = Instance.new("TextButton")
     button.Name = key .. "Toggle"
     button.Size = UDim2.new(1, -4, 0, 48)
@@ -604,7 +642,11 @@ local function createSetting(parent, name, detail, key, order)
     button.Activated:Connect(function()
         settings[key] = not settings[key]
         update()
-        refreshESP()
+        if callback then
+            callback(settings[key])
+        else
+            refreshESP()
+        end
     end)
 
     update()
@@ -698,6 +740,15 @@ local function createColorPicker(name, detail, key, order)
         end)
     end
 end
+
+-- POPULATE MOVEMENTS TAB
+createSetting(movementsPage, "Noclip", "Walk through walls and obstacles", "Noclip", 1, function(enabled)
+    if enabled then
+        startNoclip()
+    else
+        stopNoclip()
+    end
+end)
 
 -- POPULATE CONFIG TAB
 createSetting(configPage, "Player Names", "Show names above players", "Names", 1)
