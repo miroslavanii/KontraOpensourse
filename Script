@@ -1,6 +1,7 @@
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -8,15 +9,15 @@ local playerGui = player:WaitForChild("PlayerGui")
 local oldGui = playerGui:FindFirstChild("MovableGui")
 if oldGui then oldGui:Destroy() end
 
--- SETTINGS (Change your default startup colors using custom RGB numbers here!)
+-- SETTINGS
 local settings = {
     Enabled = false,
     Names = true,
     Highlights = true,
     Fill = true,
     Outline = true,
-    FillColor = Color3.fromRGB(255, 255, 255),    -- Example: Color3.fromRGB(255, 128, 0) for Orange
-    OutlineColor = Color3.fromRGB(255, 255, 255) -- Example: Color3.fromRGB(0, 255, 255) for Cyan
+    FillColor = Color3.fromRGB(255, 255, 255),
+    OutlineColor = Color3.fromRGB(255, 255, 255)
 }
 
 local espObjects = {}
@@ -171,15 +172,15 @@ tabBar.Position = UDim2.fromOffset(10, 46)
 tabBar.BackgroundTransparency = 1
 tabBar.Parent = main
 
-local function createTab(name, position)
+local function createTab(name, size, position)
     local button = Instance.new("TextButton")
     button.Name = name .. "TabButton"
-    button.Size = UDim2.new(0.5, -4, 1, 0)
+    button.Size = size
     button.Position = position
     button.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
     button.Text = name
     button.TextColor3 = Color3.new(1, 1, 1)
-    button.TextSize = 14
+    button.TextSize = 12
     button.Font = Enum.Font.GothamBold
     button.BorderSizePixel = 0
     button.Parent = tabBar
@@ -187,14 +188,26 @@ local function createTab(name, position)
     return button
 end
 
-local espTab = createTab("ESP", UDim2.new(0, 0, 0, 0))
-local configTab = createTab("Config", UDim2.new(0.5, 4, 0, 0))
+local espTab = createTab("ESP", UDim2.new(0.33, -4, 1, 0), UDim2.new(0, 0, 0, 0))
+local movementsTab = createTab("Movements", UDim2.new(0.33, -4, 1, 0), UDim2.new(0.33, 2, 0, 0))
+local configTab = createTab("Config", UDim2.new(0.34, -4, 1, 0), UDim2.new(0.66, 4, 0, 0))
 
 local espPage = Instance.new("Frame")
 espPage.Size = UDim2.new(1, -20, 1, -100)
 espPage.Position = UDim2.fromOffset(10, 90)
 espPage.BackgroundTransparency = 1
 espPage.Parent = main
+
+local movementsPage = Instance.new("ScrollingFrame")
+movementsPage.Size = UDim2.new(1, -20, 1, -100)
+movementsPage.Position = UDim2.fromOffset(10, 90)
+movementsPage.BackgroundTransparency = 1
+movementsPage.BorderSizePixel = 0
+movementsPage.ScrollBarThickness = 4
+movementsPage.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
+movementsPage.CanvasSize = UDim2.new(0, 0, 0, 0)
+movementsPage.Visible = false
+movementsPage.Parent = main
 
 local configPage = Instance.new("ScrollingFrame")
 configPage.Size = UDim2.new(1, -20, 1, -100)
@@ -207,6 +220,11 @@ configPage.CanvasSize = UDim2.new(0, 0, 0, 0)
 configPage.Visible = false
 configPage.Parent = main
 
+local movementsLayout = Instance.new("UIListLayout")
+movementsLayout.Padding = UDim.new(0, 8)
+movementsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+movementsLayout.Parent = movementsPage
+
 local layout = Instance.new("UIListLayout")
 layout.Padding = UDim.new(0, 8)
 layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -214,10 +232,16 @@ layout.Parent = configPage
 
 local function selectTab(name)
     espPage.Visible = name == "ESP"
+    movementsPage.Visible = name == "Movements"
     configPage.Visible = name == "Config"
 
     tween(espTab, 0.15, nil, nil, {
         BackgroundColor3 = name == "ESP"
+            and Color3.fromRGB(50, 50, 50)
+            or Color3.fromRGB(15, 15, 15)
+    })
+    tween(movementsTab, 0.15, nil, nil, {
+        BackgroundColor3 = name == "Movements"
             and Color3.fromRGB(50, 50, 50)
             or Color3.fromRGB(15, 15, 15)
     })
@@ -228,13 +252,9 @@ local function selectTab(name)
     })
 end
 
-espTab.Activated:Connect(function()
-    selectTab("ESP")
-end)
-
-configTab.Activated:Connect(function()
-    selectTab("Config")
-end)
+espTab.Activated:Connect(function() selectTab("ESP") end)
+movementsTab.Activated:Connect(function() selectTab("Movements") end)
+configTab.Activated:Connect(function() selectTab("Config") end)
 
 selectTab("ESP")
 
@@ -375,8 +395,8 @@ espButton.Activated:Connect(function()
     refreshESP()
 end)
 
--- CONFIG SWITCHES
-local function createSetting(name, detail, key, order)
+-- GENERIC TOGGLE CREATOR
+local function createSetting(parent, name, detail, key, order)
     local button = Instance.new("TextButton")
     button.Name = key .. "Toggle"
     button.Size = UDim2.new(1, -4, 0, 48)
@@ -384,7 +404,7 @@ local function createSetting(name, detail, key, order)
     button.Text = ""
     button.BorderSizePixel = 0
     button.LayoutOrder = order
-    button.Parent = configPage
+    button.Parent = parent
     Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
 
     local label = Instance.new("TextLabel")
@@ -438,7 +458,7 @@ local function createSetting(name, detail, key, order)
     update()
 end
 
--- CONFIG COLOR PICKER PRESETS (You can add your own custom RGB numbers here using Color3.fromRGB(R, G, B))
+-- CONFIG COLOR PICKER PRESETS
 local colors = {
     {Name = "White", Color = Color3.fromRGB(255, 255, 255)},
     {Name = "Red", Color = Color3.fromRGB(255, 50, 50)},
@@ -447,8 +467,8 @@ local colors = {
     {Name = "Yellow", Color = Color3.fromRGB(255, 255, 50)},
     {Name = "Purple", Color = Color3.fromRGB(180, 50, 255)},
     {Name = "Cyan", Color = Color3.fromRGB(50, 255, 255)},
-    {Name = "Orange", Color = Color3.fromRGB(255, 128, 0)}, -- Custom example
-    {Name = "Pink", Color = Color3.fromRGB(255, 105, 180)}    -- Custom example
+    {Name = "Orange", Color = Color3.fromRGB(255, 128, 0)},
+    {Name = "Pink", Color = Color3.fromRGB(255, 105, 180)}
 }
 
 local function createColorPicker(name, detail, key, order)
@@ -526,12 +546,17 @@ local function createColorPicker(name, detail, key, order)
     end
 end
 
-createSetting("Player Names", "Show names above players", "Names", 1)
-createSetting("Player Highlight", "Highlight characters through walls", "Highlights", 2)
-createSetting("Highlight Fill", "Show the inside of highlights", "Fill", 3)
-createSetting("Highlight Outline", "Show the outline of highlights", "Outline", 4)
+-- POPULATE CONFIG TAB
+createSetting(configPage, "Player Names", "Show names above players", "Names", 1)
+createSetting(configPage, "Player Highlight", "Highlight characters through walls", "Highlights", 2)
+createSetting(configPage, "Highlight Fill", "Show the inside of highlights", "Fill", 3)
+createSetting(configPage, "Highlight Outline", "Show the outline of highlights", "Outline", 4)
 createColorPicker("Fill Color", "Choose highlight fill color", "FillColor", 5)
 createColorPicker("Outline Color", "Choose highlight outline color", "OutlineColor", 6)
+
+movementsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    movementsPage.CanvasSize = UDim2.new(0, 0, 0, movementsLayout.AbsoluteContentSize.Y + 8)
+end)
 
 layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     configPage.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 8)
