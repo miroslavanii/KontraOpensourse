@@ -35,10 +35,12 @@ local function tween(obj, duration, style, direction, props)
     return tw
 end
 
--- SCREEN GUI
+-- SCREEN GUI (ALWAYS ON TOP)
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "MovableGui"
 screenGui.ResetOnSpawn = false
+screenGui.DisplayOrder = 999999
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
 screenGui.Parent = playerGui
 
 -- OPEN/CLOSE POPUP HINT
