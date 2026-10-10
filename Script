@@ -8,13 +8,15 @@ local playerGui = player:WaitForChild("PlayerGui")
 local oldGui = playerGui:FindFirstChild("MovableGui")
 if oldGui then oldGui:Destroy() end
 
--- SETTINGS
+-- SETTINGS (Change your default startup colors using custom RGB numbers here!)
 local settings = {
     Enabled = false,
     Names = true,
     Highlights = true,
     Fill = true,
-    Outline = true
+    Outline = true,
+    FillColor = Color3.fromRGB(255, 255, 255),    -- Example: Color3.fromRGB(255, 128, 0) for Orange
+    OutlineColor = Color3.fromRGB(255, 255, 255) -- Example: Color3.fromRGB(0, 255, 255) for Cyan
 }
 
 local espObjects = {}
@@ -288,6 +290,8 @@ local function addESP(target)
             current.highlight.Enabled = settings.Highlights
             current.highlight.FillTransparency = settings.Fill and 0.5 or 1
             current.highlight.OutlineTransparency = settings.Outline and 0 or 1
+            current.highlight.FillColor = settings.FillColor
+            current.highlight.OutlineColor = settings.OutlineColor
         end
         if current.nameTag then
             current.nameTag.Enabled = settings.Names
@@ -309,8 +313,8 @@ local function addESP(target)
         highlight.Name = "PlayerESP"
         highlight.Adornee = character
         highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        highlight.FillColor = Color3.new(1, 1, 1)
-        highlight.OutlineColor = Color3.new(1, 1, 1)
+        highlight.FillColor = settings.FillColor
+        highlight.OutlineColor = settings.OutlineColor
         highlight.FillTransparency = settings.Fill and 0.5 or 1
         highlight.OutlineTransparency = settings.Outline and 0 or 1
         highlight.Parent = screenGui
@@ -434,10 +438,100 @@ local function createSetting(name, detail, key, order)
     update()
 end
 
+-- CONFIG COLOR PICKER PRESETS (You can add your own custom RGB numbers here using Color3.fromRGB(R, G, B))
+local colors = {
+    {Name = "White", Color = Color3.fromRGB(255, 255, 255)},
+    {Name = "Red", Color = Color3.fromRGB(255, 50, 50)},
+    {Name = "Green", Color = Color3.fromRGB(50, 255, 50)},
+    {Name = "Blue", Color = Color3.fromRGB(50, 150, 255)},
+    {Name = "Yellow", Color = Color3.fromRGB(255, 255, 50)},
+    {Name = "Purple", Color = Color3.fromRGB(180, 50, 255)},
+    {Name = "Cyan", Color = Color3.fromRGB(50, 255, 255)},
+    {Name = "Orange", Color = Color3.fromRGB(255, 128, 0)}, -- Custom example
+    {Name = "Pink", Color = Color3.fromRGB(255, 105, 180)}    -- Custom example
+}
+
+local function createColorPicker(name, detail, key, order)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(1, -4, 0, 68)
+    frame.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    frame.BorderSizePixel = 0
+    frame.LayoutOrder = order
+    frame.Parent = configPage
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(0.68, 0, 0, 22)
+    label.Position = UDim2.fromOffset(10, 4)
+    label.BackgroundTransparency = 1
+    label.Text = name
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextSize = 13
+    label.Font = Enum.Font.GothamBold
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = frame
+
+    local sub = Instance.new("TextLabel")
+    sub.Size = UDim2.new(0.72, 0, 0, 16)
+    sub.Position = UDim2.fromOffset(10, 24)
+    sub.BackgroundTransparency = 1
+    sub.Text = detail
+    sub.TextColor3 = Color3.fromRGB(150, 150, 150)
+    sub.TextSize = 10
+    sub.Font = Enum.Font.Gotham
+    sub.TextXAlignment = Enum.TextXAlignment.Left
+    sub.Parent = frame
+
+    local colorContainer = Instance.new("ScrollingFrame")
+    colorContainer.Size = UDim2.new(1, -20, 0, 26)
+    colorContainer.Position = UDim2.fromOffset(10, 40)
+    colorContainer.BackgroundTransparency = 1
+    colorContainer.BorderSizePixel = 0
+    colorContainer.CanvasSize = UDim2.new(0, (#colors * 34) - 4, 0, 0)
+    colorContainer.ScrollBarThickness = 0
+    colorContainer.Parent = frame
+
+    local uiList = Instance.new("UIListLayout")
+    uiList.FillDirection = Enum.FillDirection.Horizontal
+    uiList.Padding = UDim.new(0, 8)
+    uiList.Parent = colorContainer
+
+    for _, colorData in ipairs(colors) do
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.fromOffset(26, 26)
+        btn.BackgroundColor3 = colorData.Color
+        btn.Text = ""
+        btn.BorderSizePixel = 0
+        btn.Parent = colorContainer
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 5)
+
+        local stroke = Instance.new("UIStroke")
+        stroke.Thickness = 2
+        stroke.Color = Color3.fromRGB(255, 255, 255)
+        stroke.Transparency = (settings[key] == colorData.Color) and 0 or 1
+        stroke.Parent = btn
+
+        btn.Activated:Connect(function()
+            settings[key] = colorData.Color
+            for _, child in ipairs(colorContainer:GetChildren()) do
+                if child:IsA("TextButton") then
+                    local s = child:FindFirstChildOfClass("UIStroke")
+                    if s then
+                        s.Transparency = (child.BackgroundColor3 == colorData.Color) and 0 or 1
+                    end
+                end
+            end
+            refreshESP()
+        end)
+    end
+end
+
 createSetting("Player Names", "Show names above players", "Names", 1)
 createSetting("Player Highlight", "Highlight characters through walls", "Highlights", 2)
 createSetting("Highlight Fill", "Show the inside of highlights", "Fill", 3)
 createSetting("Highlight Outline", "Show the outline of highlights", "Outline", 4)
+createColorPicker("Fill Color", "Choose highlight fill color", "FillColor", 5)
+createColorPicker("Outline Color", "Choose highlight outline color", "OutlineColor", 6)
 
 layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     configPage.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 8)
