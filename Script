@@ -53,7 +53,7 @@ hint.Position = UDim2.new(0.5, -140, 1, -50)
 hint.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
 hint.BackgroundTransparency = 0.15
 hint.BorderSizePixel = 0
-hint.Text = "X / Ctrl to open and close the menu"
+hint.Text = "X / Alt to open and close the menu"
 hint.TextColor3 = Color3.new(1, 1, 1)
 hint.TextSize = 12
 hint.Font = Enum.Font.GothamBold
@@ -652,7 +652,8 @@ end)
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
 
-    if input.KeyCode == Enum.KeyCode.LeftControl
+    if input.KeyCode == Enum.KeyCode.LeftAlt
+        or input.KeyCode == Enum.KeyCode.RightAlt
         or input.KeyCode == Enum.KeyCode.X then
         toggleGUI()
     end
